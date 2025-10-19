@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Delivery Route Planner</title>
+    <style>
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+        }
+
+        header {
+            background: #1a73e8;
+            color: white;
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 1.5rem;
+        }
+
+        header p {
+            margin: 0.5rem 0 0;
+            font-size: 0.95rem;
+            line-height: 1.4;
+        }
+
+        main {
+            display: flex;
+            flex-direction: column;
+            height: calc(100% - 132px);
+        }
+
+        #map {
+            flex: 1;
+            min-height: 400px;
+        }
+
+        .controls {
+            padding: 1rem 2rem;
+            background: white;
+            box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .controls button {
+            align-self: flex-start;
+            background: #1a73e8;
+            border: none;
+            border-radius: 4px;
+            color: white;
+            cursor: pointer;
+            font-size: 0.95rem;
+            padding: 0.5rem 1rem;
+            transition: background 0.3s ease;
+        }
+
+        .controls button:hover {
+            background: #1257b5;
+        }
+
+        .controls p {
+            margin: 0;
+            font-size: 0.9rem;
+            color: #333;
+        }
+
+        .badge {
+            background: rgba(26, 115, 232, 0.1);
+            border-radius: 12px;
+            color: #1a73e8;
+            display: inline-block;
+            font-size: 0.8rem;
+            margin-left: 0.5rem;
+            padding: 0.15rem 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Delivery Route Planner</h1>
+        <p>
+            Click on the map to drop stops in order. The planner will automatically build
+            an optimized driving route that connects every marker.
+        </p>
+    </header>
+
+    <main>
+        <div id="map"></div>
+        <section class="controls">
+            <button id="clear-btn" type="button">Clear markers &amp; route</button>
+            <p>
+                Stops added: <span id="stop-count" class="badge">0</span>
+                — Add two or more markers to see the integrated path.
+            </p>
+        </section>
+    </main>
+
+    <script>
+        let map;
+        let markers = [];
+        let directionsService;
+        let directionsRenderer;
+
+        function initMap() {
+            map = new google.maps.Map(document.getElementById("map"), {
+                center: { lat: 25.276987, lng: 55.296249 }, // Default to Dubai
+                zoom: 11,
+                mapTypeControl: false,
+                streetViewControl: false,
+            });
+
+            directionsService = new google.maps.DirectionsService();
+            directionsRenderer = new google.maps.DirectionsRenderer({
+                suppressMarkers: true,
+                map,
+            });
+
+            map.addListener("click", (event) => {
+                addMarker(event.latLng);
+                updateRoute();
+            });
+
+            document.getElementById("clear-btn").addEventListener("click", clearMap);
+        }
+
+        function addMarker(position) {
+            const marker = new google.maps.Marker({
+                position,
+                map,
+                label: String(markers.length + 1),
+            });
+
+            markers.push(marker);
+            updateBadge();
+        }
+
+        function updateRoute() {
+            if (markers.length < 2) {
+                directionsRenderer.set("directions", null);
+                return;
+            }
+
+            const origin = markers[0].getPosition();
+            const destination = markers[markers.length - 1].getPosition();
+            const waypoints = markers.slice(1, -1).map((marker) => ({
+                location: marker.getPosition(),
+                stopover: true,
+            }));
+
+            directionsService.route(
+                {
+                    origin,
+                    destination,
+                    waypoints,
+                    optimizeWaypoints: true,
+                    travelMode: google.maps.TravelMode.DRIVING,
+                },
+                (result, status) => {
+                    if (status === google.maps.DirectionsStatus.OK) {
+                        directionsRenderer.setDirections(result);
+                        updateMarkerLabels(result);
+                    } else {
+                        console.error("Directions request failed due to", status);
+                    }
+                }
+            );
+        }
+
+        function updateMarkerLabels(result) {
+            if (!result) {
+                return;
+            }
+
+            const route = result.routes[0];
+            const order = route.waypoint_order || [];
+
+            // Reset labels before applying new order
+            markers.forEach((marker, index) => marker.setLabel(String(index + 1)));
+
+            order.forEach((waypointIndex, sequenceIndex) => {
+                markers[waypointIndex + 1].setLabel(String(sequenceIndex + 2));
+            });
+
+            markers[markers.length - 1].setLabel(String(order.length + 2));
+        }
+
+        function clearMap() {
+            markers.forEach((marker) => marker.setMap(null));
+            markers = [];
+            directionsRenderer.set("directions", null);
+            updateBadge();
+        }
+
+        function updateBadge() {
+            document.getElementById("stop-count").textContent = markers.length;
+        }
+    </script>
+
+    <script
+        async
+        defer
+        src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY&callback=initMap"
+    ></script>
+</body>
+</html>
