@@ -1,15 +1,20 @@
-from flask import Flask, request, jsonify
+import os
+
+from flask import Flask, request, jsonify, render_template
 import openai
 import requests
 from langdetect import detect
 
 app = Flask(__name__)
 
-openai.api_key = "YOUR_OPENAI_API_KEY"
+openai.api_key = os.getenv("OPENAI_API_KEY", "YOUR_OPENAI_API_KEY")
 
-woocommerce_url = "https://YOUR-WOOCOMMERCE-URL.com/wp-json/wc/v3/products"
-consumer_key = "YOUR_WC_CONSUMER_KEY"
-consumer_secret = "YOUR_WC_CONSUMER_SECRET"
+woocommerce_url = os.getenv(
+    "WOOCOMMERCE_URL", "https://YOUR-WOOCOMMERCE-URL.com/wp-json/wc/v3/products"
+)
+consumer_key = os.getenv("WOOCOMMERCE_CONSUMER_KEY", "YOUR_WC_CONSUMER_KEY")
+consumer_secret = os.getenv("WOOCOMMERCE_CONSUMER_SECRET", "YOUR_WC_CONSUMER_SECRET")
+google_maps_api_key = os.getenv("GOOGLE_MAPS_API_KEY")
 
 def search_products(query):
     params = {
@@ -23,6 +28,12 @@ def search_products(query):
         return [f"{p['name']} - {p['price']}" for p in products]
     else:
         return ["❌ لا يمكن الوصول إلى المنتجات."]
+
+@app.route("/")
+def map_view():
+    """Render the multi-stop delivery planning map."""
+    return render_template("map.html", google_maps_api_key=google_maps_api_key)
+
 
 @app.route("/chat", methods=["POST"])
 def chat():
